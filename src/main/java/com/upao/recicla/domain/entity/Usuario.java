@@ -45,6 +45,8 @@ public class Usuario implements UserDetails {
     @Column(unique = true, nullable = false, length = 8)
     @Pattern(regexp = "\\d{8}")
     private String dni;
+    @Column(name = "wallet_address", unique = true, length = 42)
+    private String walletAddress;
     @Enumerated(EnumType.STRING)
     private Rol rol;
     @Enumerated(EnumType.STRING)

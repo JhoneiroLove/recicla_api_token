@@ -20,6 +20,8 @@ public class Canje {
     private LocalDate fecha;
     @Column(name = "puntos_canjeados")
     private Double puntosCanjear;
+    @Column(name = "blockchain_tx_hash", length = 66)
+    private String blockchainTxHash;
     @ManyToOne(fetch = FetchType.LAZY)
     private Usuario usuario;
     @ManyToOne(fetch = FetchType.LAZY)

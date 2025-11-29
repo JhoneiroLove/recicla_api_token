@@ -27,6 +27,8 @@ public class Actividad {
     private String imagen;
     @Column(columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP", insertable = false)
     private LocalDateTime fecha;
+    @Column(name = "blockchain_tx_hash", length = 66)
+    private String blockchainTxHash;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "residuo_id")
     private Residuo residuo;
