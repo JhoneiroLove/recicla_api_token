@@ -45,7 +45,8 @@ public class Usuario implements UserDetails {
     @Column(unique = true, nullable = false, length = 8)
     @Pattern(regexp = "\\d{8}")
     private String dni;
-    @Column(name = "wallet_address", unique = true, length = 42)
+    @Column(name = "wallet_address", unique = true, length = 42, nullable = false)
+    @Pattern(regexp = "^0x[a-fA-F0-9]{40}$", message = "Wallet address inválida")
     private String walletAddress;
     @Enumerated(EnumType.STRING)
     private Rol rol;

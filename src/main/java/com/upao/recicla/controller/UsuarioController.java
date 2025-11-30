@@ -1,7 +1,6 @@
 package com.upao.recicla.controller;
 
 import com.upao.recicla.domain.dto.usuarioDto.*;
-import com.upao.recicla.domain.entity.Rol;
 import com.upao.recicla.domain.entity.Usuario;
 import com.upao.recicla.domain.service.UsuarioService;
 import com.upao.recicla.infra.security.LoginRequest;
@@ -15,10 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
 
 @RestController
 @RequestMapping("/usuario")
@@ -49,10 +45,11 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.login(request));
     }
 
+    // Ahora se requiere wallet address
     @PostMapping("/registrar")
     @Transactional
-    public ResponseEntity<TokenResponse> addUsuario(@RequestBody Usuario usuario) {
-        return ResponseEntity.ok(usuarioService.addUsuario(usuario));
+    public ResponseEntity<TokenResponse> addUsuario(@RequestBody @Valid DatosRegistroUsuarioConWallet datos) {
+        return ResponseEntity.ok(usuarioService.addUsuario(datos));
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMINISTRADOR')")

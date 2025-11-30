@@ -2,6 +2,7 @@ package com.upao.recicla.domain.service;
 
 import com.upao.recicla.blockchain.dto.TransactionResult;
 import com.upao.recicla.blockchain.service.BlockchainService;
+import com.upao.recicla.domain.dto.usuarioDto.DatosRegistroUsuarioConWallet;
 import com.upao.recicla.domain.entity.NivelUsuario;
 import com.upao.recicla.domain.entity.Rol;
 import com.upao.recicla.domain.entity.Usuario;
@@ -19,10 +20,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.web3j.crypto.Keys;
-import org.web3j.crypto.ECKeyPair;
 
-import java.security.SecureRandom;
 import java.util.Optional;
 
 @RequiredArgsConstructor
@@ -49,47 +47,62 @@ public class UsuarioService {
     }
 
     @Transactional
-    public TokenResponse addUsuario(Usuario usuario) {
-        // generar wallet address
-        String walletAddress = generateWalletAddress();
-        log.info("Wallet generada para {}: {}", usuario.getUsername(), walletAddress);
+    public TokenResponse addUsuario(DatosRegistroUsuarioConWallet datos) {
+        // Validar que la wallet no esté ya registrada
+        if (usuarioRepository.existsByWalletAddress(datos.walletAddress())) {
+            throw new RuntimeException("Esta wallet ya está registrada en el sistema");
+        }
+
+        // Validar que el DNI no esté registrado
+        if (usuarioRepository.existsByDni(datos.dni())) {
+            throw new RuntimeException("Este DNI ya está registrado");
+        }
+
+        // Validar formato de wallet address
+        if (!datos.walletAddress().matches("^0x[a-fA-F0-9]{40}$")) {
+            throw new RuntimeException("Formato de wallet address inválido");
+        }
+
+        log.info("Registrando usuario con wallet de MetaMask: {}", datos.walletAddress());
 
         Usuario user = Usuario.builder()
-                .username(usuario.getUsername())
-                .password(passwordEncoder.encode(usuario.getPassword()))
-                .nombre(usuario.getNombre())
-                .edad(usuario.getEdad())
-                .telefono(usuario.getTelefono())
-                .correo(usuario.getCorreo())
+                .username(datos.username())
+                .password(passwordEncoder.encode(datos.password()))
+                .nombre(datos.nombre())
+                .edad(datos.edad())
+                .telefono(datos.telefono())
+                .correo(datos.correo())
                 .puntos(0.0)
-                .dni(usuario.getDni())
-                .walletAddress(walletAddress)
+                .dni(datos.dni())
+                .walletAddress(datos.walletAddress())  // Wallet del usuario
                 .rol(Rol.PARTICIPANTE)
                 .nivel(NivelUsuario.PLATA)
                 .build();
 
         usuarioRepository.save(user);
 
-        // registrar en blockchain
+        // Registrar en blockchain (backend paga gas)
         if (blockchainService != null) {
             try {
-                log.info("Registrando usuario en blockchain...");
+                log.info("Registrando usuario en blockchain whitelist...");
                 TransactionResult result = blockchainService.registerUserOnChain(
-                        walletAddress,
-                        usuario.getDni()
+                        datos.walletAddress(),
+                        datos.dni()
                 );
 
                 if (result.isSuccess()) {
                     log.info("Usuario registrado en blockchain. TX: {}", result.getTransactionHash());
                 } else {
-                    log.warn("⚠No se pudo registrar en blockchain: {}", result.getErrorMessage());
+                    log.error("Error en blockchain: {}", result.getErrorMessage());
+                    // Decidir si falla todo o continúa
+                    throw new RuntimeException("Error registrando en blockchain: " + result.getErrorMessage());
                 }
             } catch (Exception e) {
                 log.error("Error al registrar en blockchain", e);
-                // No falla el registro si blockchain falla
+                throw new RuntimeException("Error al registrar en blockchain: " + e.getMessage());
             }
         } else {
-            log.info("Blockchain deshabilitado, usuario registrado solo en DB");
+            log.warn("Blockchain deshabilitado");
         }
 
         String token = jwtService.getToken(user, user);
@@ -97,25 +110,6 @@ public class UsuarioService {
                 .token(token)
                 .build();
     }
-
-    // generar wallet address
-    private String generateWalletAddress() {
-        try {
-            // Generar un par de claves aleatorio
-            SecureRandom random = new SecureRandom();
-            byte[] privateKeyBytes = new byte[32];
-            random.nextBytes(privateKeyBytes);
-
-            ECKeyPair keyPair = ECKeyPair.create(privateKeyBytes);
-            String address = "0x" + Keys.getAddress(keyPair);
-
-            return address;
-        } catch (Exception e) {
-            log.error("Error generando wallet address", e);
-            throw new RuntimeException("No se pudo generar wallet address");
-        }
-    }
-    // ========================================================
 
     public Page<Usuario> getAllUsuarios(Pageable pageable) {
         return usuarioRepository.findAll(pageable);

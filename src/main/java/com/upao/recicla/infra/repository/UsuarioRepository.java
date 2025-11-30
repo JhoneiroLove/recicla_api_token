@@ -7,4 +7,13 @@ import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByUsername(String username);
+
+    // Validar wallet única
+    boolean existsByWalletAddress(String walletAddress);
+
+    // Validar DNI único
+    boolean existsByDni(String dni);
+
+    // Buscar por wallet
+    Optional<Usuario> findByWalletAddress(String walletAddress);
 }
