@@ -43,11 +43,11 @@ public class ActividadController {
     private static final List<String> FORMATOS_PERMITIDOS = Arrays.asList("image/png", "image/jpeg", "image/jpg");
     private static final long TAMANO_MAXIMO = 5 * 1024 * 1024; // 5MB
 
-
     private final UsuarioRepository usuarioRepository;
 
     @GetMapping
-    public ResponseEntity<Page<DatosListadoActividad>> getAllActividades(@PageableDefault(size = 10) Pageable pageable) {
+    public ResponseEntity<Page<DatosListadoActividad>> getAllActividades(
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(actividadService.getAllActividades(pageable).map(DatosListadoActividad::new));
     }
 
@@ -59,10 +59,11 @@ public class ActividadController {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         List<Actividad> actividades = actividadService.getActividadesPorUsuarioId(usuario.getId());
         if (actividades.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "El historial de actividades está vacío. Empieza a reciclar para ganar puntos." );
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El historial de actividades está vacío. Empieza a reciclar para ganar puntos.");
         }
-        List<DatosRespuestaActividad> datosActividades = actividades.stream().map(actividad ->
-                new DatosRespuestaActividad(
+        List<DatosRespuestaActividad> datosActividades = actividades.stream()
+                .map(actividad -> new DatosRespuestaActividad(
                         actividad.getId(),
                         actividad.getNombre(),
                         actividad.getCantidad(),
@@ -76,17 +77,17 @@ public class ActividadController {
                         actividad.getResiduo().getPuntos(),
                         actividad.getUsuario().getId(),
                         actividad.getUsuario().getNombre(),
-                        actividad.getUsuario().getPuntos())
-        ).collect(Collectors.toList());
+                        actividad.getUsuario().getPuntos()))
+                .collect(Collectors.toList());
         return ResponseEntity.ok(datosActividades);
     }
 
     @PostMapping("/registro")
     @Transactional
     public ResponseEntity<DatosDetallesActividad> addActividad(@RequestParam("nombre") String nombre,
-                                                               @RequestParam("cantidad") Double cantidad,
-                                                               @RequestParam("nombreResiduo") String nombreResiduo,
-                                                               @RequestParam("image") MultipartFile imagen) throws IOException {
+            @RequestParam("cantidad") Double cantidad,
+            @RequestParam("nombreResiduo") String nombreResiduo,
+            @RequestParam("image") MultipartFile imagen) throws IOException {
 
         String imagenPath = guardarImagen(imagen);
 
@@ -95,7 +96,7 @@ public class ActividadController {
         actividad.setCantidad(cantidad);
         actividad.setImagen(imagenPath);
 
-        actividadService.addActividad(actividad, nombreResiduo);
+        actividadService.addActividad(actividad, nombreResiduo, imagen);
 
         DatosDetallesActividad datosDetallesActividad = new DatosDetallesActividad(actividad);
         UriComponentsBuilder builder = UriComponentsBuilder.newInstance();
@@ -171,4 +172,3 @@ public class ActividadController {
     }
 
 }
-

@@ -2,6 +2,7 @@ package com.upao.recicla.domain.service;
 
 import com.upao.recicla.blockchain.dto.TransactionResult;
 import com.upao.recicla.blockchain.service.BlockchainService;
+import com.upao.recicla.blockchain.service.IPFSService;
 import com.upao.recicla.domain.entity.Actividad;
 import com.upao.recicla.domain.entity.Residuo;
 import com.upao.recicla.domain.entity.Usuario;
@@ -18,8 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,9 +39,12 @@ public class ActividadService {
     @Autowired(required = false)
     private BlockchainService blockchainService;
 
+    @Autowired(required = false)
+    private IPFSService ipfsService;
+
     public ActividadService(ActividadRepository actividadRepository,
-                            ResiduoRepository residuoRepository,
-                            UsuarioRepository usuarioRepository) {
+            ResiduoRepository residuoRepository,
+            UsuarioRepository usuarioRepository) {
         this.actividadRepository = actividadRepository;
         this.residuoRepository = residuoRepository;
         this.usuarioRepository = usuarioRepository;
@@ -62,7 +66,7 @@ public class ActividadService {
         return actividadRepository.getReferenceById(id);
     }
 
-    public ResponseEntity<String> addActividad(Actividad actividad, String nombreResiduo) {
+    public ResponseEntity<String> addActividad(Actividad actividad, String nombreResiduo, MultipartFile imagen) {
         if (actividad.getCantidad() <= 0) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("La cantidad no debe ser menor que 0.");
@@ -81,32 +85,45 @@ public class ActividadService {
 
         double puntosGanados = actividad.getCantidad() * residuo.getPuntos();
 
-        // acuñar tokens en blockchain
         if (blockchainService != null && usuario.getWalletAddress() != null) {
             try {
-                log.info("Acuñando {} tokens en blockchain para {}", puntosGanados, usuario.getUsername());
+                log.info("📝 Proponiendo actividad en blockchain para {}: {}kg de {}",
+                        usuario.getUsername(), actividad.getCantidad(), residuo.getNombre());
 
-                String description = String.format("Reciclaje: %s - %.2f kg de %s",
-                        actividad.getNombre(),
-                        actividad.getCantidad(),
-                        residuo.getNombre()
-                );
+                String evidenciaIPFS = "QmPendiente";
 
-                TransactionResult result = blockchainService.mintTokensForActivity(
+                // Subir imagen a IPFS si está disponible
+                if (ipfsService != null && imagen != null && !imagen.isEmpty()) {
+                    try {
+                        String metadata = String.format(
+                                "{\"usuario\":\"%s\",\"material\":\"%s\",\"peso\":%d,\"fecha\":\"%s\"}",
+                                usuario.getUsername(),
+                                residuo.getNombre(),
+                                actividad.getCantidad().intValue(),
+                                java.time.LocalDateTime.now().toString());
+
+                        evidenciaIPFS = ipfsService.uploadEvidencia(imagen, metadata);
+                        log.info("📎 Evidencia subida a IPFS: {}", evidenciaIPFS);
+                    } catch (Exception ipfsError) {
+                        log.error("❌ Error subiendo evidencia a IPFS: {}", ipfsError.getMessage());
+                    }
+                }
+
+                TransactionResult result = blockchainService.proponerActividad(
                         usuario.getWalletAddress(),
-                        BigDecimal.valueOf(puntosGanados),
-                        description
-                );
+                        actividad.getCantidad().intValue(),
+                        mapearTipoMaterial(residuo.getNombre()),
+                        evidenciaIPFS);
 
                 if (result.isSuccess()) {
                     actividad.setBlockchainTxHash(result.getTransactionHash());
-                    log.info("Tokens acuñados en blockchain. TX: {}", result.getTransactionHash());
+                    log.info("✅ Actividad propuesta en blockchain. TX: {} - Esperando validación ONG",
+                            result.getTransactionHash());
                 } else {
-                    log.warn("No se pudieron acuñar tokens en blockchain: {}", result.getErrorMessage());
+                    log.warn("⚠️ No se pudo proponer actividad en blockchain: {}", result.getErrorMessage());
                 }
             } catch (Exception e) {
-                log.error("Error acuñando tokens en blockchain", e);
-                // Continúa aunque falle blockchain
+                log.error("❌ Error proponiendo actividad en blockchain", e);
             }
         } else {
             log.info("ℹ️ Blockchain deshabilitado o usuario sin wallet");
@@ -116,6 +133,23 @@ public class ActividadService {
         actividadRepository.save(actividad);
 
         return ResponseEntity.ok("Actividad registrada con éxito. Puntos ganados: " + puntosGanados + ".");
+    }
+
+    private String mapearTipoMaterial(String nombreResiduo) {
+        String nombre = nombreResiduo.toLowerCase();
+        if (nombre.contains("plastico") || nombre.contains("plástico"))
+            return "plastico";
+        if (nombre.contains("papel"))
+            return "papel";
+        if (nombre.contains("vidrio"))
+            return "vidrio";
+        if (nombre.contains("metal") || nombre.contains("aluminio"))
+            return "metal";
+        if (nombre.contains("carton") || nombre.contains("cartón"))
+            return "carton";
+        if (nombre.contains("organico") || nombre.contains("orgánico"))
+            return "organico";
+        return "plastico";
     }
 
     private void actualizarPuntosUsuario(Long idUsuario, double puntos) {
@@ -151,7 +185,6 @@ public class ActividadService {
                 actividad.getResiduo().getNombre(),
                 actividad.getCantidad(),
                 actividad.getCantidad() * actividad.getResiduo().getPuntos(),
-                actividad.getBlockchainTxHash() != null ? actividad.getBlockchainTxHash() : "N/A"
-        );
+                actividad.getBlockchainTxHash() != null ? actividad.getBlockchainTxHash() : "N/A");
     }
 }

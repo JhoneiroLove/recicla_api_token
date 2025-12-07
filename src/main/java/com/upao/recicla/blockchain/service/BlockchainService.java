@@ -1,6 +1,7 @@
 package com.upao.recicla.blockchain.service;
 
 import com.upao.recicla.blockchain.contracts.ReciclaToken;
+import com.upao.recicla.blockchain.dto.ActividadPropuesta;
 import com.upao.recicla.blockchain.dto.BlockchainBalance;
 import com.upao.recicla.blockchain.dto.TransactionResult;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,8 @@ import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @ConditionalOnProperty(name = "blockchain.enabled", havingValue = "true")
@@ -38,8 +41,7 @@ public class BlockchainService {
                     tokenContractAddress,
                     web3j,
                     backendCredentials,
-                    gasProvider
-            );
+                    gasProvider);
 
             TransactionReceipt receipt = contract.addToWhitelist(walletAddress, dniHash).send();
 
@@ -47,8 +49,7 @@ public class BlockchainService {
 
             return TransactionResult.success(
                     receipt.getTransactionHash(),
-                    receipt.getBlockNumber().longValue()
-            );
+                    receipt.getBlockNumber().longValue());
 
         } catch (Exception e) {
             log.error("❌ Error registrando usuario", e);
@@ -56,23 +57,151 @@ public class BlockchainService {
         }
     }
 
-    public TransactionResult mintTokensForActivity(String userWallet, BigDecimal tokenAmount, String description) {
+    /**
+     * Propone una actividad de reciclaje en blockchain (nuevo sistema de
+     * multi-firma)
+     * El backend solo PROPONE, no acuña directamente. Requiere aprobación de
+     * validadores.
+     *
+     * @param userWallet    Wallet del usuario que recicló
+     * @param pesoKg        Peso del material en kilogramos
+     * @param tipoMaterial  Tipo de material (plastico, papel, vidrio, metal,
+     *                      carton, organico)
+     * @param evidenciaIPFS Hash IPFS de la evidencia fotográfica
+     * @return Resultado de la transacción con ID de la actividad propuesta
+     */
+    public TransactionResult proponerActividad(String userWallet, Integer pesoKg, String tipoMaterial,
+            String evidenciaIPFS) {
         try {
-            log.info("🪙 Acuñando {} REC para {}", tokenAmount, userWallet);
+            log.info("📝 Proponiendo actividad: usuario={}, material={}, peso={}kg, evidencia={}",
+                    userWallet, tipoMaterial, pesoKg, evidenciaIPFS);
 
-            BigInteger amountInWei = Convert.toWei(tokenAmount, Convert.Unit.ETHER).toBigInteger();
+            ReciclaToken contract = ReciclaToken.load(
+                    tokenContractAddress,
+                    web3j,
+                    backendCredentials,
+                    gasProvider);
 
-            ReciclaToken contract = ReciclaToken.load(tokenContractAddress, web3j, backendCredentials, gasProvider);
+            // Llamar a proponerActividad en el contrato
+            TransactionReceipt receipt = contract.proponerActividad(
+                    userWallet,
+                    BigInteger.valueOf(pesoKg),
+                    tipoMaterial,
+                    evidenciaIPFS).send();
 
-            TransactionReceipt receipt = contract.mintForActivity(userWallet, amountInWei, description).send();
+            log.info("✅ Actividad propuesta. TX: {} - Esperando aprobación de validadores (0/2)",
+                    receipt.getTransactionHash());
 
-            log.info("✅ Tokens acuñados. TX: {}", receipt.getTransactionHash());
-
-            return TransactionResult.success(receipt.getTransactionHash(), receipt.getBlockNumber().longValue());
+            return TransactionResult.success(
+                    receipt.getTransactionHash(),
+                    receipt.getBlockNumber().longValue());
 
         } catch (Exception e) {
-            log.error("❌ Error acuñando tokens", e);
+            log.error("❌ Error proponiendo actividad", e);
             return TransactionResult.failure(e.getMessage());
+        }
+    }
+
+    /**
+     * Validador aprueba una actividad propuesta
+     * Cuando se alcanzan 2 aprobaciones, el contrato minta tokens automáticamente
+     *
+     * @param actividadId          ID de la actividad a aprobar
+     * @param validadorCredentials Credenciales del validador (no del backend)
+     * @return Resultado de la transacción
+     */
+    public TransactionResult aprobarActividad(BigInteger actividadId, Credentials validadorCredentials) {
+        try {
+            log.info("✅ Validador aprobando actividad #{}", actividadId);
+
+            ReciclaToken contract = ReciclaToken.load(
+                    tokenContractAddress,
+                    web3j,
+                    validadorCredentials, // Importante: usar credenciales del validador
+                    gasProvider);
+
+            TransactionReceipt receipt = contract.aprobarActividad(actividadId).send();
+
+            log.info("✅ Actividad aprobada. TX: {}", receipt.getTransactionHash());
+
+            return TransactionResult.success(
+                    receipt.getTransactionHash(),
+                    receipt.getBlockNumber().longValue());
+
+        } catch (Exception e) {
+            log.error("❌ Error aprobando actividad", e);
+            return TransactionResult.failure(e.getMessage());
+        }
+    }
+
+    /**
+     * Validador rechaza una actividad propuesta
+     *
+     * @param actividadId          ID de la actividad a rechazar
+     * @param razon                Razón del rechazo
+     * @param validadorCredentials Credenciales del validador
+     * @return Resultado de la transacción
+     */
+    public TransactionResult rechazarActividad(BigInteger actividadId, String razon, Credentials validadorCredentials) {
+        try {
+            log.info("❌ Validador rechazando actividad #{}: {}", actividadId, razon);
+
+            ReciclaToken contract = ReciclaToken.load(
+                    tokenContractAddress,
+                    web3j,
+                    validadorCredentials,
+                    gasProvider);
+
+            TransactionReceipt receipt = contract.rechazarActividad(actividadId, razon).send();
+
+            log.info("✅ Actividad rechazada. TX: {}", receipt.getTransactionHash());
+
+            return TransactionResult.success(
+                    receipt.getTransactionHash(),
+                    receipt.getBlockNumber().longValue());
+
+        } catch (Exception e) {
+            log.error("❌ Error rechazando actividad", e);
+            return TransactionResult.failure(e.getMessage());
+        }
+    }
+
+    /**
+     * Consulta información de una actividad propuesta
+     *
+     * @param actividadId ID de la actividad
+     * @return Información de la actividad
+     */
+    public ActividadPropuesta getActividad(BigInteger actividadId) {
+        try {
+            ReciclaToken contract = ReciclaToken.load(
+                    tokenContractAddress,
+                    web3j,
+                    backendCredentials,
+                    gasProvider);
+
+            org.web3j.abi.datatypes.DynamicStruct actividad = contract.getActividad(actividadId).send();
+
+            @SuppressWarnings("rawtypes")
+            java.util.List components = actividad.getValue();
+            return ActividadPropuesta.builder()
+                    .actividadId(actividadId.longValue())
+                    .usuarioWallet(((org.web3j.abi.datatypes.Type) components.get(1)).getValue().toString())
+                    .pesoKg(((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(2)).getValue()).intValue())
+                    .tipoMaterial(((org.web3j.abi.datatypes.Type) components.get(3)).getValue().toString())
+                    .evidenciaIPFS(((org.web3j.abi.datatypes.Type) components.get(4)).getValue().toString())
+                    .tokensCalculados(
+                            Convert.fromWei(((org.web3j.abi.datatypes.Type) components.get(5)).getValue().toString(),
+                                    Convert.Unit.ETHER))
+                    .aprobaciones(
+                            ((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(7)).getValue()).intValue())
+                    .ejecutada((Boolean) ((org.web3j.abi.datatypes.Type) components.get(8)).getValue())
+                    .rechazada((Boolean) ((org.web3j.abi.datatypes.Type) components.get(9)).getValue())
+                    .build();
+
+        } catch (Exception e) {
+            log.error("❌ Error consultando actividad", e);
+            return null;
         }
     }
 
@@ -116,5 +245,67 @@ public class BlockchainService {
             log.error("❌ Error consultando balance", e);
             return null;
         }
+    }
+
+    /**
+     * Obtiene todas las propuestas de actividades pendientes de aprobación
+     * Filtra las que no han sido ejecutadas ni rechazadas
+     * 
+     * @return Lista de propuestas pendientes
+     */
+    public List<ActividadPropuesta> getPropuestasPendientes() {
+        List<ActividadPropuesta> propuestas = new ArrayList<>();
+
+        try {
+            ReciclaToken contract = ReciclaToken.load(tokenContractAddress, web3j, backendCredentials, gasProvider);
+
+            BigInteger contadorActividades = contract.contadorActividades().send();
+            log.info("📋 Consultando {} actividades totales", contadorActividades);
+
+            for (BigInteger i = BigInteger.ONE; i.compareTo(contadorActividades) <= 0; i = i.add(BigInteger.ONE)) {
+                try {
+                    var actividad = contract.getActividad(i).send();
+                    @SuppressWarnings("rawtypes")
+                    java.util.List components = actividad.getValue();
+
+                    Boolean ejecutada = (Boolean) ((org.web3j.abi.datatypes.Type) components.get(8)).getValue();
+                    Boolean rechazada = (Boolean) ((org.web3j.abi.datatypes.Type) components.get(9)).getValue();
+
+                    if (!ejecutada && !rechazada) {
+                        @SuppressWarnings("unchecked")
+                        java.util.List<String> aprobaciones = (java.util.List<String>) ((org.web3j.abi.datatypes.Type) components
+                                .get(7)).getValue();
+
+                        ActividadPropuesta propuesta = ActividadPropuesta.builder()
+                                .actividadId(
+                                        ((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(0)).getValue())
+                                                .longValue())
+                                .usuarioWallet(((org.web3j.abi.datatypes.Type) components.get(1)).getValue().toString())
+                                .pesoKg(((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(2)).getValue())
+                                        .intValue())
+                                .tipoMaterial(((org.web3j.abi.datatypes.Type) components.get(3)).getValue().toString())
+                                .evidenciaIPFS(((org.web3j.abi.datatypes.Type) components.get(4)).getValue().toString())
+                                .tokensCalculados(Convert.fromWei(
+                                        ((org.web3j.abi.datatypes.Type) components.get(5)).getValue().toString(),
+                                        Convert.Unit.ETHER))
+                                .aprobaciones(aprobaciones.size())
+                                .ejecutada(ejecutada)
+                                .rechazada(rechazada)
+                                .build();
+
+                        propuestas.add(propuesta);
+                    }
+                } catch (Exception e) {
+                    log.warn("⚠️ Error leyendo actividad #{}: {}", i, e.getMessage());
+                }
+            }
+
+            log.info("✅ Encontradas {} propuestas pendientes", propuestas.size());
+
+        } catch (Exception e) {
+            log.error("❌ Error consultando propuestas pendientes", e);
+        }
+
+        return propuestas;
     }
 }

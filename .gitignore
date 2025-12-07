@@ -32,4 +32,27 @@ build/
 ### VS Code ###
 .vscode/
 
+# ==================== SEGURIDAD PRODUCCIÓN ====================
+# Variables de entorno sensibles
 .env
+.env.local
+.env.production
+
+# Private keys y credenciales blockchain
+*.key
+*.pem
+wallets/
+credentials/
+
+# Logs que pueden contener información sensible
+logs/
+*.log
+spring-boot.log
+
+# Archivos temporales IPFS
+ipfs-cache/
+uploads/
+
+# Application properties con credenciales reales
+application-prod.properties
+application-local.properties
