@@ -22,14 +22,19 @@
 		<sonar.projectKey>recicla_upao</sonar.projectKey>
 	</properties>
 
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.google.cloud</groupId>
+				<artifactId>spring-cloud-gcp-dependencies</artifactId>
+				<version>5.8.0</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
-		<dependency>
-			<groupId>com.google.cloud</groupId>
-			<artifactId>spring-cloud-gcp-dependencies</artifactId>
-			<version>5.8.0</version>
-			<type>pom</type>
-			<scope>import</scope>
-		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -183,21 +188,12 @@
 							<sourceDestination>src/main/java</sourceDestination>
 							<nativeJavaType>true</nativeJavaType>
 							<outputFormat>java</outputFormat>
-							<soliditySourceFiles>
-								<directory>../recicla-upao-token/contracts</directory>
-								<includes>
-									<include>**/*.sol</include>
-								</includes>
-							</soliditySourceFiles>
 							<abiSourceFiles>
-								<directory>../recicla-upao-token</directory>
+								<directory>../recicla-upao-token/artifacts/contracts/ReciclaToken.sol</directory>
 								<includes>
-									<include>ReciclaToken-abi.json</include>
+									<include>ReciclaToken.json</include>
 								</includes>
 							</abiSourceFiles>
-							<outputDirectory>
-								<directory>src/main/java</directory>
-							</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>

@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-@Table(name = "usuarios", uniqueConstraints = {@UniqueConstraint(columnNames = {"username"})})
+@Table(name = "usuarios", uniqueConstraints = { @UniqueConstraint(columnNames = { "username" }) })
 @Entity(name = "Usuario")
 @Getter
 @Setter
@@ -53,22 +53,19 @@ public class Usuario implements UserDetails {
     @Enumerated(EnumType.STRING)
     private NivelUsuario nivel;
     @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinTable(
-            name = "comunidades_usuarios",
-            joinColumns = @JoinColumn(name = "usuario_id", referencedColumnName = "id"),
-            inverseJoinColumns = @JoinColumn(name = "comunidad_id", referencedColumnName = "id")
-    )
+    @JoinTable(name = "comunidades_usuarios", joinColumns = @JoinColumn(name = "usuario_id", referencedColumnName = "id"), inverseJoinColumns = @JoinColumn(name = "comunidad_id", referencedColumnName = "id"))
+    @Builder.Default
     private List<Comunidad> comunidades = new ArrayList<>();
 
     public void actualizarNivel() {
         this.nivel = NivelUsuario.determinarNivel(this.puntos, this.nivel);
     }
 
-    public Usuario(Long usuario_id){
+    public Usuario(Long usuario_id) {
         this.id = usuario_id;
     }
 
-    public Usuario(DatosRegistroUsuario datos){
+    public Usuario(DatosRegistroUsuario datos) {
         this.nombre = datos.nombre();
         this.edad = datos.edad();
         this.telefono = datos.telefono();
@@ -79,17 +76,17 @@ public class Usuario implements UserDetails {
         this.password = datos.password();
     }
 
-    public void actualizarUsuario(DatosActualizarUsuario datosActualizarUsuario){
-        if (datosActualizarUsuario.nombre() != null){
+    public void actualizarUsuario(DatosActualizarUsuario datosActualizarUsuario) {
+        if (datosActualizarUsuario.nombre() != null) {
             this.nombre = datosActualizarUsuario.nombre();
         }
-        if (datosActualizarUsuario.correo() != null){
+        if (datosActualizarUsuario.correo() != null) {
             this.correo = datosActualizarUsuario.correo();
         }
     }
 
-    public void actualizarRolUsuario(DatosActualizarRolUsuario datosActualizarRolUsuario){
-        if (datosActualizarRolUsuario.rol() != null){
+    public void actualizarRolUsuario(DatosActualizarRolUsuario datosActualizarRolUsuario) {
+        if (datosActualizarRolUsuario.rol() != null) {
             this.rol = datosActualizarRolUsuario.rol();
         }
     }

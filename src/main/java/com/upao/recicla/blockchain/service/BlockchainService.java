@@ -190,23 +190,19 @@ public class BlockchainService {
                     backendCredentials,
                     gasProvider);
 
-            org.web3j.abi.datatypes.DynamicStruct actividad = contract.getActividad(actividadId).send();
+            org.web3j.tuples.generated.Tuple10<String, BigInteger, String, String, BigInteger, BigInteger, BigInteger, Boolean, Boolean, String> actividad = contract
+                    .getActividad(actividadId).send();
 
-            @SuppressWarnings("rawtypes")
-            java.util.List components = actividad.getValue();
             return ActividadPropuesta.builder()
                     .actividadId(actividadId.longValue())
-                    .usuarioWallet(((org.web3j.abi.datatypes.Type) components.get(1)).getValue().toString())
-                    .pesoKg(((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(2)).getValue()).intValue())
-                    .tipoMaterial(((org.web3j.abi.datatypes.Type) components.get(3)).getValue().toString())
-                    .evidenciaIPFS(((org.web3j.abi.datatypes.Type) components.get(4)).getValue().toString())
-                    .tokensCalculados(
-                            Convert.fromWei(((org.web3j.abi.datatypes.Type) components.get(5)).getValue().toString(),
-                                    Convert.Unit.ETHER))
-                    .aprobaciones(
-                            ((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(7)).getValue()).intValue())
-                    .ejecutada((Boolean) ((org.web3j.abi.datatypes.Type) components.get(8)).getValue())
-                    .rechazada((Boolean) ((org.web3j.abi.datatypes.Type) components.get(9)).getValue())
+                    .usuarioWallet(actividad.component1())
+                    .pesoKg(actividad.component2().intValue())
+                    .tipoMaterial(actividad.component3())
+                    .evidenciaIPFS(actividad.component4())
+                    .tokensCalculados(Convert.fromWei(actividad.component5().toString(), Convert.Unit.ETHER))
+                    .aprobaciones(actividad.component7().intValue())
+                    .ejecutada(actividad.component8())
+                    .rechazada(actividad.component9())
                     .build();
 
         } catch (Exception e) {

@@ -84,6 +84,7 @@ public class ActividadController {
         return ResponseEntity.ok(datosActividades);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_CENTRO_ACOPIO')")
     @GetMapping("/historial-centro")
     public ResponseEntity<List<DatosRespuestaActividad>> getHistorialRegistradoPorCentro() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

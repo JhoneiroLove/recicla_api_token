@@ -190,6 +190,7 @@ public class ActividadService {
             try {
                 log.info("📝 Centro de Acopio proponiendo actividad para {}: {}kg de {}",
                         estudiante.getUsername(), actividad.getCantidad(), residuo.getNombre());
+                log.info("🔑 Wallet del estudiante: {}", estudiante.getWalletAddress());
 
                 String evidenciaIPFS = "QmPendiente";
 
