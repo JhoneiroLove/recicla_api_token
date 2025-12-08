@@ -1,8 +1,10 @@
 package com.upao.recicla.infra.repository;
 
+import com.upao.recicla.domain.entity.Rol;
 import com.upao.recicla.domain.entity.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
@@ -16,4 +18,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     // Buscar por wallet
     Optional<Usuario> findByWalletAddress(String walletAddress);
+
+    // Buscar por rol
+    List<Usuario> findByRol(Rol rol);
 }

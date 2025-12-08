@@ -25,40 +25,36 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 public class SecurityConfig implements WebMvcConfigurer {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final AuthenticationProvider authProvider;
+        private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final AuthenticationProvider authProvider;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // Configuración CORS
-        http.cors(cors -> cors.configurationSource(request -> {
-            CorsConfiguration configuration = new CorsConfiguration();
-            configuration.setAllowedOrigins(Arrays.asList("*"));
-            configuration.setAllowedOrigins(Arrays.asList("http://localhost:4200"));
-            configuration.setAllowedOrigins(Arrays.asList("https://recicla-upao.netlify.app"));
-            configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-            configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type"));
-            configuration.setAllowCredentials(true);
-            return configuration;
-        }));
-        //Cross-site request forgery (CSRF)
-        return http.csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(authRequest ->
-                        authRequest
-                                .requestMatchers(HttpMethod.GET).permitAll()
-                                .requestMatchers(HttpMethod.POST).permitAll()
-                                .requestMatchers(HttpMethod.PUT).permitAll()
-                                .requestMatchers(HttpMethod.DELETE).permitAll()
-                                .requestMatchers(HttpMethod.OPTIONS).permitAll()
-                                .requestMatchers("/usuario/**").permitAll()
-                                .requestMatchers("/swagger-ui.html", "/v3/api-docs/*","/swagger-ui/*").permitAll()
-                                .anyRequest().authenticated()
-                )
-                .sessionManagement(sessionManager ->
-                        sessionManager
-                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authProvider)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
-    }}
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                // Configuración CORS
+                http.cors(cors -> cors.configurationSource(request -> {
+                        CorsConfiguration configuration = new CorsConfiguration();
+                        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+                        configuration.setAllowedMethods(Arrays.asList("*"));
+                        configuration.setAllowedHeaders(Arrays.asList("*"));
+                        configuration.setExposedHeaders(Arrays.asList("*"));
+                        configuration.setAllowCredentials(true);
+                        return configuration;
+                }));
 
+                // Cross-site request forgery (CSRF)
+                return http.csrf(csrf -> csrf.disable())
+                                .authorizeHttpRequests(authRequest -> authRequest
+                                                .requestMatchers(HttpMethod.POST, "/usuario/login").permitAll()
+                                                .requestMatchers(HttpMethod.POST, "/usuario/registrar").permitAll()
+                                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                                .requestMatchers("/swagger-ui.html", "/v3/api-docs/**",
+                                                                "/swagger-ui/**")
+                                                .permitAll()
+                                                .anyRequest().authenticated())
+                                .sessionManagement(sessionManager -> sessionManager
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authenticationProvider(authProvider)
+                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                                .build();
+        }
+}

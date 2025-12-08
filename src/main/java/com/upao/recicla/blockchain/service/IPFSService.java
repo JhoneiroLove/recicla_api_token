@@ -46,17 +46,23 @@ public class IPFSService {
      * Sube una imagen de evidencia a IPFS vía Pinata
      * 
      * @param file     Imagen de la actividad de reciclaje
-     * @param metadata Metadata adicional para el pin
+     * @param metadata Metadata adicional para el pin (JSON string)
      * @return Hash IPFS (CID) de la evidencia
      */
     public String uploadEvidencia(MultipartFile file, String metadata) throws IOException {
         log.info("📤 Subiendo evidencia a Pinata IPFS: {} ({} bytes)", file.getOriginalFilename(), file.getSize());
 
+        // Crear el objeto pinataMetadata con el campo "name" requerido
+        String pinataMetadata = String.format(
+                "{\"name\":\"%s\",\"keyvalues\":%s}",
+                file.getOriginalFilename(),
+                metadata);
+
         RequestBody requestBody = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("file", file.getOriginalFilename(),
                         RequestBody.create(file.getBytes(), MediaType.parse(file.getContentType())))
-                .addFormDataPart("pinataMetadata", metadata)
+                .addFormDataPart("pinataMetadata", pinataMetadata)
                 .build();
 
         Request request = new Request.Builder()

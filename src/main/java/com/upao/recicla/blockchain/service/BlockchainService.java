@@ -8,9 +8,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.Hash;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthCall;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.tx.gas.StaticGasProvider;
 import org.web3j.utils.Convert;
@@ -18,6 +26,8 @@ import org.web3j.utils.Convert;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -248,64 +258,142 @@ public class BlockchainService {
     }
 
     /**
-     * Obtiene todas las propuestas de actividades pendientes de aprobación
-     * Filtra las que no han sido ejecutadas ni rechazadas
-     * 
-     * @return Lista de propuestas pendientes
+     * Obtiene todas las actividades pendientes (no ejecutadas ni rechazadas)
      */
     public List<ActividadPropuesta> getPropuestasPendientes() {
-        List<ActividadPropuesta> propuestas = new ArrayList<>();
+        List<ActividadPropuesta> propuestasPendientes = new ArrayList<>();
 
         try {
-            ReciclaToken contract = ReciclaToken.load(tokenContractAddress, web3j, backendCredentials, gasProvider);
+            // Obtener el contador total de actividades llamando directamente al contrato
+            BigInteger totalActividades = getActividadCounter();
 
-            BigInteger contadorActividades = contract.contadorActividades().send();
-            log.info("📋 Consultando {} actividades totales", contadorActividades);
+            log.info("📊 Total de actividades en blockchain: {}", totalActividades);
 
-            for (BigInteger i = BigInteger.ONE; i.compareTo(contadorActividades) <= 0; i = i.add(BigInteger.ONE)) {
+            // Iterar sobre todas las actividades y filtrar las pendientes
+            for (BigInteger i = BigInteger.ZERO; i.compareTo(totalActividades) < 0; i = i.add(BigInteger.ONE)) {
                 try {
-                    var actividad = contract.getActividad(i).send();
-                    @SuppressWarnings("rawtypes")
-                    java.util.List components = actividad.getValue();
+                    ActividadPropuesta propuesta = getActividadDirecta(i);
 
-                    Boolean ejecutada = (Boolean) ((org.web3j.abi.datatypes.Type) components.get(8)).getValue();
-                    Boolean rechazada = (Boolean) ((org.web3j.abi.datatypes.Type) components.get(9)).getValue();
-
-                    if (!ejecutada && !rechazada) {
-                        @SuppressWarnings("unchecked")
-                        java.util.List<String> aprobaciones = (java.util.List<String>) ((org.web3j.abi.datatypes.Type) components
-                                .get(7)).getValue();
-
-                        ActividadPropuesta propuesta = ActividadPropuesta.builder()
-                                .actividadId(
-                                        ((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(0)).getValue())
-                                                .longValue())
-                                .usuarioWallet(((org.web3j.abi.datatypes.Type) components.get(1)).getValue().toString())
-                                .pesoKg(((BigInteger) ((org.web3j.abi.datatypes.Type) components.get(2)).getValue())
-                                        .intValue())
-                                .tipoMaterial(((org.web3j.abi.datatypes.Type) components.get(3)).getValue().toString())
-                                .evidenciaIPFS(((org.web3j.abi.datatypes.Type) components.get(4)).getValue().toString())
-                                .tokensCalculados(Convert.fromWei(
-                                        ((org.web3j.abi.datatypes.Type) components.get(5)).getValue().toString(),
-                                        Convert.Unit.ETHER))
-                                .aprobaciones(aprobaciones.size())
-                                .ejecutada(ejecutada)
-                                .rechazada(rechazada)
-                                .build();
-
-                        propuestas.add(propuesta);
+                    // Solo incluir actividades pendientes (no ejecutadas ni rechazadas)
+                    if (propuesta != null && !propuesta.getEjecutada() && !propuesta.getRechazada()) {
+                        propuestasPendientes.add(propuesta);
                     }
                 } catch (Exception e) {
-                    log.warn("⚠️ Error leyendo actividad #{}: {}", i, e.getMessage());
+                    log.warn("⚠️ Error procesando actividad {}: {}", i, e.getMessage());
                 }
             }
 
-            log.info("✅ Encontradas {} propuestas pendientes", propuestas.size());
+            log.info("✅ Propuestas pendientes encontradas: {}", propuestasPendientes.size());
 
         } catch (Exception e) {
-            log.error("❌ Error consultando propuestas pendientes", e);
+            log.error("❌ Error obteniendo propuestas pendientes", e);
         }
 
-        return propuestas;
+        return propuestasPendientes;
     }
+
+    /**
+     * Obtiene una actividad llamando directamente al contrato sin wrapper
+     */
+    private ActividadPropuesta getActividadDirecta(BigInteger actividadId) throws Exception {
+        // Crear la función para llamar a actividades(uint256)
+        Function function = new Function(
+                "actividades",
+                Collections.singletonList(new org.web3j.abi.datatypes.generated.Uint256(actividadId)),
+                Arrays.asList(
+                        new TypeReference<org.web3j.abi.datatypes.generated.Uint256>() {
+                        }, // id
+                        new TypeReference<org.web3j.abi.datatypes.Address>() {
+                        }, // usuario
+                        new TypeReference<org.web3j.abi.datatypes.generated.Uint256>() {
+                        }, // pesoKg
+                        new TypeReference<org.web3j.abi.datatypes.Utf8String>() {
+                        }, // tipoMaterial
+                        new TypeReference<org.web3j.abi.datatypes.Utf8String>() {
+                        }, // evidenciaIPFS
+                        new TypeReference<org.web3j.abi.datatypes.generated.Uint256>() {
+                        }, // tokensCalculados
+                        new TypeReference<org.web3j.abi.datatypes.generated.Uint256>() {
+                        }, // timestamp
+                        new TypeReference<org.web3j.abi.datatypes.generated.Uint8>() {
+                        }, // aprobaciones
+                        new TypeReference<org.web3j.abi.datatypes.Bool>() {
+                        }, // ejecutada
+                        new TypeReference<org.web3j.abi.datatypes.Bool>() {
+                        }, // rechazada
+                        new TypeReference<org.web3j.abi.datatypes.Address>() {
+                        } // propuestoPor
+                ));
+
+        String encodedFunction = FunctionEncoder.encode(function);
+
+        EthCall response = web3j.ethCall(
+                Transaction.createEthCallTransaction(
+                        backendCredentials.getAddress(),
+                        tokenContractAddress,
+                        encodedFunction),
+                DefaultBlockParameterName.LATEST).send();
+
+        List<Type> result = FunctionReturnDecoder.decode(
+                response.getValue(),
+                function.getOutputParameters());
+
+        if (result.isEmpty() || result.size() < 11) {
+            return null;
+        }
+
+        // Extraer valores del resultado
+        String usuarioWallet = result.get(1).getValue().toString();
+        BigInteger pesoKg = (BigInteger) result.get(2).getValue();
+        String tipoMaterial = result.get(3).getValue().toString();
+        String evidenciaIPFS = result.get(4).getValue().toString();
+        BigInteger tokensCalculadosWei = (BigInteger) result.get(5).getValue();
+        BigInteger aprobaciones = (BigInteger) result.get(7).getValue();
+        Boolean ejecutada = (Boolean) result.get(8).getValue();
+        Boolean rechazada = (Boolean) result.get(9).getValue();
+
+        return ActividadPropuesta.builder()
+                .actividadId(actividadId.longValue())
+                .usuarioWallet(usuarioWallet)
+                .pesoKg(pesoKg.intValue())
+                .tipoMaterial(tipoMaterial)
+                .evidenciaIPFS(evidenciaIPFS)
+                .tokensCalculados(Convert.fromWei(tokensCalculadosWei.toString(), Convert.Unit.ETHER))
+                .aprobaciones(aprobaciones.intValue())
+                .ejecutada(ejecutada)
+                .rechazada(rechazada)
+                .build();
+    }
+
+    /**
+     * Obtiene el contador de actividades directamente del contrato
+     */
+    private BigInteger getActividadCounter() throws Exception {
+        // Crear la función para llamar a actividadCounter()
+        Function function = new Function(
+                "actividadCounter",
+                Collections.emptyList(),
+                Collections.singletonList(new TypeReference<org.web3j.abi.datatypes.generated.Uint256>() {
+                }));
+
+        String encodedFunction = FunctionEncoder.encode(function);
+
+        EthCall response = web3j.ethCall(
+                Transaction.createEthCallTransaction(
+                        backendCredentials.getAddress(),
+                        tokenContractAddress,
+                        encodedFunction),
+                DefaultBlockParameterName.LATEST).send();
+
+        List<Type> result = FunctionReturnDecoder.decode(
+                response.getValue(),
+                function.getOutputParameters());
+
+        if (result.isEmpty()) {
+            return BigInteger.ZERO;
+        }
+
+        return (BigInteger) result.get(0).getValue();
+    }
+
 }
