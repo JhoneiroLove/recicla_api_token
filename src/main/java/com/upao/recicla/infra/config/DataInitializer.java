@@ -26,6 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         crearAdministrador();
         crearValidadores();
+        crearCentroAcopio();
         actualizarNivelesNulos();
     }
 
@@ -132,6 +133,42 @@ public class DataInitializer implements CommandLineRunner {
             log.info("   💼 Wallet:   {}", validador2Wallet);
         } else {
             log.info("ℹ️  Validador 2 ya existe");
+        }
+    }
+
+    /**
+     * Crea el usuario del Centro de Acopio si no existe
+     * Account #4 de Hardhat - Responsable de registrar actividades de estudiantes
+     */
+    private void crearCentroAcopio() {
+        String centroWallet = "0x15d34AAf54267DB7D7c367839AAf71A00A2C6A65";
+        var centroExist = usuarioRepository.findByWalletAddress(centroWallet);
+
+        if (centroExist.isEmpty()) {
+            log.info("🔧 Creando usuario Centro de Acopio...");
+
+            Usuario centro = Usuario.builder()
+                    .nombre("Centro de Acopio UPAO")
+                    .edad("0")
+                    .telefono("987654323")
+                    .correo("centroacopio@reciclaupao.edu.pe")
+                    .username("centroacopio")
+                    .password(passwordEncoder.encode("centro123"))
+                    .dni("33333333")
+                    .walletAddress(centroWallet)
+                    .rol(Rol.CENTRO_ACOPIO)
+                    .nivel(NivelUsuario.DIAMANTE)
+                    .puntos(0.0)
+                    .build();
+
+            usuarioRepository.save(centro);
+
+            log.info("✅ Centro de Acopio creado exitosamente");
+            log.info("   👤 Username: centroacopio");
+            log.info("   🔑 Password: centro123");
+            log.info("   💼 Wallet:   {}", centroWallet);
+        } else {
+            log.info("ℹ️  Centro de Acopio ya existe");
         }
     }
 

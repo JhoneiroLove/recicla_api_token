@@ -11,6 +11,7 @@ import com.upao.recicla.infra.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/actividad")
 @CrossOrigin("*")
 @RequiredArgsConstructor
+@Slf4j
 public class ActividadController {
 
     @Autowired
@@ -97,6 +99,35 @@ public class ActividadController {
         actividad.setImagen(imagenPath);
 
         actividadService.addActividad(actividad, nombreResiduo, imagen);
+
+        DatosDetallesActividad datosDetallesActividad = new DatosDetallesActividad(actividad);
+        UriComponentsBuilder builder = UriComponentsBuilder.newInstance();
+        builder.path("/{id}").buildAndExpand(actividad.getId());
+        return ResponseEntity.created(builder.build().toUri()).body(datosDetallesActividad);
+    }
+
+    @PostMapping("/registro-centro")
+    @Transactional
+    public ResponseEntity<DatosDetallesActividad> addActividadCentro(
+            @RequestParam("walletEstudiante") String walletEstudiante,
+            @RequestParam("cantidad") Double cantidad,
+            @RequestParam("nombreResiduo") String nombreResiduo,
+            @RequestParam("image") MultipartFile imagen) throws IOException {
+
+        log.info("📦 Centro de Acopio registrando actividad para estudiante: {}", walletEstudiante);
+
+        String imagenPath = guardarImagen(imagen);
+
+        Actividad actividad = new Actividad();
+        actividad.setNombre("Entrega Centro Acopio");
+        actividad.setCantidad(cantidad);
+        actividad.setImagen(imagenPath);
+
+        // Buscar usuario por wallet
+        Usuario estudiante = usuarioRepository.findByWalletAddress(walletEstudiante)
+                .orElseThrow(() -> new RuntimeException("Estudiante no encontrado con wallet: " + walletEstudiante));
+
+        actividadService.addActividadCentro(actividad, nombreResiduo, estudiante, imagen);
 
         DatosDetallesActividad datosDetallesActividad = new DatosDetallesActividad(actividad);
         UriComponentsBuilder builder = UriComponentsBuilder.newInstance();

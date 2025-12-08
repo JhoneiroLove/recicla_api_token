@@ -159,6 +159,72 @@ public class ActividadService {
         usuarioRepository.save(usuario);
     }
 
+    public ResponseEntity<String> addActividadCentro(Actividad actividad, String nombreResiduo, Usuario estudiante,
+            MultipartFile imagen) {
+        if (actividad.getCantidad() <= 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("La cantidad no debe ser menor que 0.");
+        }
+
+        actividad.setUsuario(estudiante);
+
+        Residuo residuo = residuoRepository.findByNombre(nombreResiduo)
+                .orElseThrow(() -> new RuntimeException("Residuo no encontrado"));
+        actividad.setResiduo(residuo);
+
+        double puntosGanados = actividad.getCantidad() * residuo.getPuntos();
+
+        if (blockchainService != null && estudiante.getWalletAddress() != null) {
+            try {
+                log.info("📝 Centro de Acopio proponiendo actividad para {}: {}kg de {}",
+                        estudiante.getUsername(), actividad.getCantidad(), residuo.getNombre());
+
+                String evidenciaIPFS = "QmPendiente";
+
+                // Subir imagen a IPFS si está disponible
+                if (ipfsService != null && imagen != null && !imagen.isEmpty()) {
+                    try {
+                        String metadata = String.format(
+                                "{\"usuario\":\"%s\",\"material\":\"%s\",\"peso\":%.2f,\"fecha\":\"%s\",\"registradoPor\":\"Centro de Acopio\"}",
+                                estudiante.getUsername(),
+                                residuo.getNombre(),
+                                actividad.getCantidad(),
+                                java.time.LocalDateTime.now().toString());
+
+                        evidenciaIPFS = ipfsService.uploadEvidencia(imagen, metadata);
+                        log.info("📎 Evidencia subida a IPFS: {}", evidenciaIPFS);
+                    } catch (Exception ipfsError) {
+                        log.error("❌ Error subiendo evidencia a IPFS: {}", ipfsError.getMessage());
+                    }
+                }
+
+                TransactionResult result = blockchainService.proponerActividad(
+                        estudiante.getWalletAddress(),
+                        actividad.getCantidad().intValue(),
+                        mapearTipoMaterial(residuo.getNombre()),
+                        evidenciaIPFS);
+
+                if (result.isSuccess()) {
+                    actividad.setBlockchainTxHash(result.getTransactionHash());
+                    log.info("✅ Actividad propuesta en blockchain. TX: {} - Esperando validación de 2 ONGs",
+                            result.getTransactionHash());
+                } else {
+                    log.warn("⚠️ No se pudo proponer actividad en blockchain: {}", result.getErrorMessage());
+                }
+            } catch (Exception e) {
+                log.error("❌ Error proponiendo actividad en blockchain", e);
+            }
+        } else {
+            log.info("ℹ️ Blockchain deshabilitado o estudiante sin wallet");
+        }
+
+        actualizarPuntosUsuario(estudiante.getId(), puntosGanados);
+        actividadRepository.save(actividad);
+
+        return ResponseEntity
+                .ok("Actividad registrada para " + estudiante.getUsername() + ". Esperando validación ONG.");
+    }
+
     public void updateActividad(Actividad actividad, Long id) {
         Actividad actividadExists = actividadRepository.findById(id)
                 .orElse(new Actividad());
