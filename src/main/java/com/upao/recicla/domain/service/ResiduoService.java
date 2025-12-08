@@ -15,22 +15,31 @@ public class ResiduoService {
     public ResiduoService(ResiduoRepository residuoRepository) {
         this.residuoRepository = residuoRepository;
     }
+
     public Page<Residuo> getAllResiduos(Pageable pageable) {
         return residuoRepository.findAll(pageable);
     }
-    public Optional<Residuo> getResiduoById(Long id){
+
+    public java.util.List<Residuo> getAllResiduosList() {
+        return residuoRepository.findAll();
+    }
+
+    public Optional<Residuo> getResiduoById(Long id) {
         return residuoRepository.findById(id);
     }
+
     public Residuo getReferenceById(Long id) {
         return residuoRepository.getReferenceById(id);
     }
-    public void addResiduo(Residuo residuo){
+
+    public void addResiduo(Residuo residuo) {
         Optional<Residuo> existente = residuoRepository.findByNombre(residuo.getNombre());
         if (existente.isPresent()) {
             throw new IllegalArgumentException("Ya existe un residuo con el nombre: " + residuo.getNombre());
         }
         residuoRepository.save(residuo);
     }
+
     public void updateResiduo(Residuo residuo, Long id) {
         Residuo residuoExists = residuoRepository.findById(id)
                 .orElse(new Residuo());
@@ -38,6 +47,7 @@ public class ResiduoService {
         residuoExists.setNombre(residuo.getNombre());
         residuoRepository.save(residuoExists);
     }
+
     public void deleteResiduoById(Long id) {
         residuoRepository.deleteById(id);
     }

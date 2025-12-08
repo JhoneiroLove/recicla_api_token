@@ -26,7 +26,7 @@ public class ResiduoController {
     @PostMapping("/crear-residuo")
     @Transactional
     public ResponseEntity<?> addResiduo(@RequestBody @Valid DatosRegistroResiduo datos,
-                                                    UriComponentsBuilder uriBuilder) {
+            UriComponentsBuilder uriBuilder) {
         try {
             var residuo = new Residuo(datos);
             residuoService.addResiduo(residuo);
@@ -40,6 +40,20 @@ public class ResiduoController {
     @GetMapping("/mostrar-residuos")
     public ResponseEntity<Page<DatosListadoResiduo>> getAllResiduos(@PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(residuoService.getAllResiduos(pageable).map(DatosListadoResiduo::new));
+    }
+
+    @GetMapping("/listar-todos")
+    public ResponseEntity<java.util.List<DatosRespuestaResiduo>> getAllResiduosList() {
+        java.util.List<DatosRespuestaResiduo> residuos = residuoService.getAllResiduosList()
+                .stream()
+                .map(residuo -> new DatosRespuestaResiduo(
+                        residuo.getId(),
+                        residuo.getNombre(),
+                        residuo.getDescripcion(),
+                        residuo.getTipo(),
+                        residuo.getPuntos()))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(residuos);
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMINISTRADOR')")
