@@ -84,6 +84,41 @@ public class ActividadController {
         return ResponseEntity.ok(datosActividades);
     }
 
+    @GetMapping("/historial-centro")
+    public ResponseEntity<List<DatosRespuestaActividad>> getHistorialRegistradoPorCentro() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String centroUsername = authentication.getName();
+        Usuario centro = usuarioRepository.findByUsername(centroUsername)
+                .orElseThrow(() -> new RuntimeException("Centro de Acopio no encontrado"));
+
+        List<Actividad> actividades = actividadService.getActividadesRegistradasPorCentro(centro.getId());
+
+        if (actividades.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No has registrado ninguna actividad todavía.");
+        }
+
+        List<DatosRespuestaActividad> datosActividades = actividades.stream()
+                .map(actividad -> new DatosRespuestaActividad(
+                        actividad.getId(),
+                        actividad.getNombre(),
+                        actividad.getCantidad(),
+                        actividad.getImagen(),
+                        actividad.getFecha(),
+                        actividad.getCantidad() * actividad.getResiduo().getPuntos(),
+                        actividad.getResiduo().getId(),
+                        actividad.getResiduo().getNombre(),
+                        actividad.getResiduo().getDescripcion(),
+                        actividad.getResiduo().getTipo(),
+                        actividad.getResiduo().getPuntos(),
+                        actividad.getUsuario().getId(),
+                        actividad.getUsuario().getNombre(),
+                        actividad.getUsuario().getPuntos()))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(datosActividades);
+    }
+
     @PostMapping("/registro")
     @Transactional
     public ResponseEntity<DatosDetallesActividad> addActividad(@RequestParam("nombre") String nombre,

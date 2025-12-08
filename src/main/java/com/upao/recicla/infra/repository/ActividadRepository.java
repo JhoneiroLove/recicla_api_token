@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface ActividadRepository extends JpaRepository<Actividad, Long> {
     List<Actividad> findByUsuarioId(Long usuarioId);
+
+    List<Actividad> findByRegistradoPorId(Long registradoPorId);
 }

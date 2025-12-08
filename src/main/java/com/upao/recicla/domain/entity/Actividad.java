@@ -35,8 +35,11 @@ public class Actividad {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "registrado_por_id")
+    private Usuario registradoPor;
 
-    public Actividad(DatosRegistroActividad datos){
+    public Actividad(DatosRegistroActividad datos) {
         this.nombre = datos.nombre();
         this.cantidad = datos.cantidad();
         this.imagen = datos.imagen();
@@ -44,14 +47,14 @@ public class Actividad {
         this.usuario = new Usuario(datos.usuario_id());
     }
 
-    public void actualizarActividad(DatosActualizarActividad datosActualizarActividad){
-        if(datosActualizarActividad.nombre() != null){
+    public void actualizarActividad(DatosActualizarActividad datosActualizarActividad) {
+        if (datosActualizarActividad.nombre() != null) {
             this.nombre = datosActualizarActividad.nombre();
         }
-        if(datosActualizarActividad.cantidad() != null){
+        if (datosActualizarActividad.cantidad() != null) {
             this.cantidad = datosActualizarActividad.cantidad();
         }
-        if (datosActualizarActividad.imagen() != null){
+        if (datosActualizarActividad.imagen() != null) {
             this.imagen = datosActualizarActividad.imagen();
         }
     }

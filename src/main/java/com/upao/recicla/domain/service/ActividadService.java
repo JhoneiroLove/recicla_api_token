@@ -62,6 +62,10 @@ public class ActividadService {
         return actividadRepository.findByUsuarioId(usuarioId);
     }
 
+    public List<Actividad> getActividadesRegistradasPorCentro(Long centroId) {
+        return actividadRepository.findByRegistradoPorId(centroId);
+    }
+
     public Actividad getReferenceById(Long id) {
         return actividadRepository.getReferenceById(id);
     }
@@ -78,6 +82,7 @@ public class ActividadService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         actividad.setUsuario(usuario);
+        actividad.setRegistradoPor(usuario); // El estudiante se registra a sí mismo
 
         Residuo residuo = residuoRepository.findByNombre(nombreResiduo)
                 .orElseThrow(() -> new RuntimeException("Residuo no encontrado"));
@@ -166,7 +171,14 @@ public class ActividadService {
                     .body("La cantidad no debe ser menor que 0.");
         }
 
+        // Obtener el usuario del Centro de Acopio que está registrando
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String centroUsername = authentication.getName();
+        Usuario centroAcopio = usuarioRepository.findByUsername(centroUsername)
+                .orElseThrow(() -> new RuntimeException("Centro de Acopio no encontrado"));
+
         actividad.setUsuario(estudiante);
+        actividad.setRegistradoPor(centroAcopio); // El Centro registró esta actividad
 
         Residuo residuo = residuoRepository.findByNombre(nombreResiduo)
                 .orElseThrow(() -> new RuntimeException("Residuo no encontrado"));
