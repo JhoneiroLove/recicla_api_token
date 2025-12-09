@@ -2,14 +2,20 @@
 
 API REST en Spring Boot para gestión de actividades de reciclaje con integración blockchain.
 
+**🌐 Red Actual:** Sepolia Testnet  
+**📍 Smart Contract:** `0x6Ee68256eF29096e8Bc66c14494E5f58650488DD`  
+**🔍 Etherscan:** https://sepolia.etherscan.io/address/0x6Ee68256eF29096e8Bc66c14494E5f58650488DD
+
 ---
 
 ## 📋 Prerequisitos
 
-- **Java JDK:** 17 o superior
+- **Java JDK:** 21 (configurado en el proyecto)
 - **Maven:** 3.6+ (o usar wrapper incluido)
 - **MySQL:** 8.0 o superior
-- **Hardhat Node:** Debe estar corriendo (ver módulo blockchain)
+- **Blockchain Node:**
+  - **Localhost:** Hardhat Node corriendo
+  - **Sepolia:** No requiere nodo local (usa RPC público/Alchemy)
 
 ---
 
@@ -46,15 +52,29 @@ spring.datasource.username=root
 spring.datasource.password=root
 ```
 
-### Blockchain
+### Blockchain - Localhost (Desarrollo)
 
 ```properties
 blockchain.enabled=true
 blockchain.network=localhost
 blockchain.rpc-url=http://127.0.0.1:8545
+blockchain.chain-id=31337
 blockchain.token-address=0x5FbDB2315678afecb367f032d93F642f64180aa3
 blockchain.backend-private-key=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
+
+### Blockchain - Sepolia (Testnet)
+
+```properties
+blockchain.enabled=true
+blockchain.network=sepolia
+blockchain.rpc-url=https://eth-sepolia.g.alchemy.com/v2/VQ_jKkFIWE-kn56xsm1Is
+blockchain.chain-id=11155111
+blockchain.token-address=0x6Ee68256eF29096e8Bc66c14494E5f58650488DD
+blockchain.backend-private-key=21ffa3d3721e3d86c87a9db030fea21a6e815c545814b0719e45acf33e1e586a
+```
+
+> ⚠️ **Para producción:** Usar variables de entorno en lugar de hardcodear private keys
 
 ### IPFS (Pinata)
 
@@ -63,16 +83,27 @@ ipfs.pinata.api-key=5efd595edd6b58314aa5
 ipfs.pinata.secret-key=870cc731d19d38efab65d9f248c677b42792a47f0f3544109089175a5d64c26f
 ```
 
-### Wallets de Usuarios Iniciales
+### Wallets de Validadores (ONGs)
 
+#### Localhost (Hardhat)
 ```properties
-admin.wallet=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 validator1.wallet=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+validator1.private-key=0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+
 validator2.wallet=0x90F79bf6EB2c4f870365E785982E1f101E93b906
-centro.wallet=0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65
+validator2.private-key=0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
 ```
 
-> 📝 Estas wallets corresponden a las cuentas de Hardhat (deterministas)
+#### Sepolia (Testnet)
+```properties
+validator1.wallet=0x7386e0F040439A743e51e156A20C88792763cBCd
+validator1.private-key=21ffa3d3721e3d86c87a9db030fea21a6e815c545814b0719e45acf33e1e586a
+
+validator2.wallet=0x7386e0F040439A743e51e156A20C88792763cBCd
+validator2.private-key=21ffa3d3721e3d86c87a9db030fea21a6e815c545814b0719e45acf33e1e586a
+```
+
+> 📝 Para producción en Sepolia: crear wallets separadas por rol con SepoliaETH
 
 ---
 
@@ -81,11 +112,13 @@ centro.wallet=0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65
 ### Opción 1: Maven Wrapper (Recomendado)
 
 ```bash
-# Compilar e instalar dependencias
+# Windows
 .\mvnw clean install
-
-# Ejecutar aplicación
 .\mvnw spring-boot:run
+
+# Linux/Mac
+./mvnw clean install
+./mvnw spring-boot:run
 ```
 
 ### Opción 2: Maven Instalado
@@ -252,7 +285,7 @@ O cerrar proceso:
 Get-Process -Id (Get-NetTCPConnection -LocalPort 8080).OwningProcess | Stop-Process
 ```
 
-### ❌ Error: "Blockchain connection failed"
+### ❌ Error: "Blockchain connection failed" (Localhost)
 
 **Causa:** Hardhat node no está corriendo.
 
@@ -261,6 +294,15 @@ Get-Process -Id (Get-NetTCPConnection -LocalPort 8080).OwningProcess | Stop-Proc
 cd ../recicla-upao-token
 npx hardhat node
 ```
+
+### ❌ Error: "Blockchain connection timeout" (Sepolia)
+
+**Causa:** RPC URL incorrecta o sin conexión a internet.
+
+**Solución:**
+1. Verifica tu RPC URL en `application.properties`
+2. Prueba con Alchemy: https://www.alchemy.com/
+3. Verifica conexión a internet
 
 ### ❌ Error: "No se crearon usuarios"
 
@@ -274,15 +316,27 @@ mysql -u root -p -e "DROP DATABASE recicla_db; CREATE DATABASE recicla_db;"
 
 ### ❌ Usuarios con wallets incorrectas
 
-**Causa:** Las wallets en `application.properties` no coinciden con Hardhat.
+**Localhost:**
+Verifica que las wallets en `application.properties` sean las de Hardhat:
+- `admin.wallet` → `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+- `validator1.wallet` → `0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC`
+- `validator2.wallet` → `0x90F79bf6EB2c4f870365E785982E1f101E93b906`
+
+**Sepolia:**
+Asegúrate de tener SepoliaETH en las wallets configuradas.
+
+### ❌ Error: "Tuple10 cannot be converted to DynamicStruct"
+
+**Causa:** Version incompatible del contrato generado.
 
 **Solución:**
-
-Verifica que las wallets en `application.properties` sean:
-- `admin.wallet` → Account #0 de Hardhat
-- `validator1.wallet` → Account #2
-- `validator2.wallet` → Account #3
-- `centro.wallet` → Account #4
+```bash
+# Regenerar contrato wrapper
+cd ../recicla-upao-token
+npx hardhat compile
+cd ../recicla_upao_nube
+.\mvnw clean install
+```
 
 ---
 
@@ -303,20 +357,56 @@ Verifica que las wallets en `application.properties` sean:
 
 # Ejecutar un test específico
 .\mvnw test -Dtest=NombreDelTest
+
+# Generar contratos wrapper Web3j
+.\mvnw web3j:generate-sources
 ```
 
 ---
 
 ## 📚 Tecnologías
 
-- **Spring Boot:** 3.2.x
+- **Spring Boot:** 3.1.5
+- **Java:** 21
 - **Spring Security:** JWT Authentication
 - **Spring Data JPA:** Acceso a datos
-- **MySQL:** Base de datos relacional
+- **MySQL:** 8.0+ Base de datos relacional
 - **Lombok:** Reducir boilerplate
-- **Web3j:** Integración con blockchain
+- **Web3j:** 4.10.3 Integración con blockchain Ethereum
 - **JavaMail:** Envío de emails
 - **Validation:** Jakarta Bean Validation
+- **IPFS/Pinata:** Almacenamiento descentralizado de evidencias
+
+---
+
+## 🌐 Configuración de Red
+
+### Localhost (Desarrollo)
+
+```properties
+blockchain.network=localhost
+blockchain.rpc-url=http://127.0.0.1:8545
+blockchain.chain-id=31337
+blockchain.token-address=0x5FbDB2315678afecb367f032d93F642f64180aa3
+```
+
+**Requisitos:**
+- Hardhat node corriendo
+- Contrato desplegado
+
+### Sepolia (Testnet)
+
+```properties
+blockchain.network=sepolia
+blockchain.rpc-url=https://eth-sepolia.g.alchemy.com/v2/API_KEY
+blockchain.chain-id=11155111
+blockchain.token-address=0x6Ee68256eF29096e8Bc66c14494E5f58650488DD
+```
+
+**Requisitos:**
+- Cuenta de Alchemy/Infura
+- Wallets con SepoliaETH
+- Smart contract desplegado en Sepolia
 
 ---
 
@@ -336,23 +426,82 @@ Verifica que las wallets en `application.properties` sean:
 3. Habilita HTTPS/TLS
 4. Implementa rate limiting
 5. Configura CORS apropiadamente
+6. Rotación de secrets periódica
 
 ---
 
 ## ✅ Checklist de Configuración
 
-- [ ] Java JDK 17+ instalado
-- [ ] MySQL instalado y corriendo
+### Localhost (Desarrollo)
+- [ ] Java JDK 21 instalado
+- [ ] MySQL 8.0+ instalado y corriendo
 - [ ] Base de datos `recicla_db` creada
 - [ ] Hardhat node corriendo en `http://127.0.0.1:8545`
-- [ ] Contrato desplegado en dirección correcta
-- [ ] `application.properties` configurado
+- [ ] Contrato desplegado en `0x5FbDB...180aa3`
+- [ ] `application.properties` configurado para localhost
 - [ ] Backend inicia sin errores
 - [ ] Usuarios creados automáticamente
-- [ ] Endpoint `/actuator/health` responde
+- [ ] Endpoint `/actuator/health` responde `{"status":"UP"}`
+
+### Sepolia (Testnet)
+- [ ] Wallets con SepoliaETH (mínimo 0.05 ETH)
+- [ ] Cuenta de Alchemy/Infura configurada
+- [ ] Smart contract desplegado en Sepolia
+- [ ] Dirección del contrato actualizada en `application.properties`
+- [ ] Private keys de wallets configuradas
+- [ ] RPC URL funcionando
+- [ ] Backend conecta a Sepolia exitosamente
+- [ ] Transacciones de prueba funcionan
+
+---
+
+## 📖 Documentación Relacionada
+
+- **Blockchain:** `../recicla-upao-token/README.md`
+- **Setup Completo:** `../recicla-upao-token/SETUP.md`
+- **Migración Sepolia:** `../recicla-upao-token/SEPOLIA_SETUP.md`
+- **Frontend:** `../recicla_app_front/README.md`
+
+---
+
+## 🎯 Estado Actual del Proyecto
+
+### ✅ Completado
+- [x] API REST completa con Spring Boot
+- [x] Integración blockchain con Web3j
+- [x] Autenticación JWT + Spring Security
+- [x] Multi-firma de ONGs (2/2 validaciones)
+- [x] Subida de evidencias a IPFS/Pinata
+- [x] Sistema de roles (Admin, ONG, Centro, Participante)
+- [x] Centro puede registrar actividades para estudiantes
+- [x] Historial de actividades por usuario
+- [x] Historial de actividades registradas por Centro
+- [x] **Funcionando en Localhost (Hardhat Local)**
+- [x] **Funcionando en Sepolia Testnet**
+- [x] Mint automático de tokens al aprobar 2 ONGs
+- [x] Burn de tokens al canjear recompensas
+
+### ⏳ En Desarrollo
+- [ ] Deploy en VPS de producción
+- [ ] Notificaciones en tiempo real
+- [ ] Dashboard de administrador mejorado
+- [ ] Reportes y estadísticas avanzadas
+
+### 🔮 Futuras Mejoras
+- [ ] Deploy en Ethereum Mainnet
+- [ ] Sistema de niveles y gamificación
+- [ ] Integración con Polygon/BSC
+- [ ] App móvil nativa (React Native)
+- [ ] Sistema de referidos y recompensas
 
 ---
 
 **Puerto:** 8080  
 **Base URL:** http://localhost:8080  
-**Health Check:** http://localhost:8080/actuator/health
+**Health Check:** http://localhost:8080/actuator/health  
+**API Docs:** http://localhost:8080/swagger-ui.html
+
+**Autor:** JhoneiroLove  
+**Versión:** 1.0.0  
+**Última Actualización:** Diciembre 2025  
+**Licencia:** MIT
